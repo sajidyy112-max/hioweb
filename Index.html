@@ -1,0 +1,742 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>Hiotami Technologies | 3D · Kinetic · Mouse Follower</title>
+  <!-- Fonts & Icons -->
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+  <!-- Locomotive Scroll CSS -->
+  <link href="https://cdn.jsdelivr.net/npm/locomotive-scroll@4.1.4/dist/locomotive-scroll.min.css" rel="stylesheet">
+  <style>
+    /* RESET + BASE */
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      cursor: none; /* hide default cursor to show our follower */
+    }
+
+    body {
+      font-family: 'Space Grotesk', sans-serif;
+      background-color: #03050b;
+      color: #f0f4ff;
+      overflow-x: hidden;
+    }
+
+    /* Canvas (Three.js background) */
+    #canvas-container {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 0;
+      pointer-events: none;
+    }
+
+    /* Main content layer */
+    [data-scroll-container] {
+      position: relative;
+      z-index: 2;
+      background: transparent;
+    }
+
+    /* MOUSE FOLLOWER (GLOWING TECH ORB) */
+    .mouse-follower {
+      position: fixed;
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(0,224,255,0.8), rgba(138,43,226,0.6));
+      box-shadow: 0 0 20px rgba(0,224,255,0.7), 0 0 8px rgba(0,224,255,0.9);
+      pointer-events: none;
+      z-index: 9999;
+      transform: translate(-50%, -50%);
+      transition: width 0.2s ease, height 0.2s ease, background 0.2s ease, box-shadow 0.2s ease;
+      backdrop-filter: blur(2px);
+      will-change: left, top;
+    }
+    /* When hovering interactive elements, enlarge and intensify */
+    .mouse-follower.hover-active {
+      width: 56px;
+      height: 56px;
+      background: radial-gradient(circle, rgba(0,224,255,1), rgba(255,51,102,0.8));
+      box-shadow: 0 0 32px rgba(0,224,255,1), 0 0 12px #ff3366;
+      mix-blend-mode: screen;
+    }
+    /* Also a trailing dot for extra tech feel */
+    .mouse-trail {
+      position: fixed;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background-color: #00e0ff;
+      box-shadow: 0 0 12px #00e0ff;
+      pointer-events: none;
+      z-index: 9998;
+      transform: translate(-50%, -50%);
+      transition: 0.05s linear;
+      will-change: left, top;
+      opacity: 0.7;
+    }
+
+    /* custom scrollbar */
+    body::-webkit-scrollbar {
+      width: 6px;
+    }
+    body::-webkit-scrollbar-track {
+      background: #0a0e1a;
+    }
+    body::-webkit-scrollbar-thumb {
+      background: #00e0ff;
+      border-radius: 8px;
+    }
+
+    /* typography & containers */
+    .container {
+      max-width: 1280px;
+      margin: 0 auto;
+      padding: 0 2rem;
+    }
+
+    section {
+      padding: 7rem 0;
+      border-bottom: 1px solid rgba(0, 224, 255, 0.12);
+    }
+
+    .section-title {
+      font-size: 3rem;
+      font-weight: 800;
+      margin-bottom: 3rem;
+      text-align: center;
+      background: linear-gradient(135deg, #fff, #00e0ff, #b05eff);
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+      letter-spacing: -0.02em;
+    }
+
+    /* Buttons */
+    .btn {
+      display: inline-block;
+      padding: 0.9rem 2rem;
+      font-weight: 600;
+      border-radius: 60px;
+      transition: transform 0.3s ease, box-shadow 0.3s;
+      text-decoration: none;
+      font-family: inherit;
+      cursor: pointer;
+      border: none;
+    }
+
+    .btn-primary {
+      background: linear-gradient(95deg, #00e0ff, #8a2be2);
+      color: #03050b;
+      box-shadow: 0 0 14px rgba(0, 224, 255, 0.6);
+    }
+
+    .btn-primary:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 10px 28px rgba(0, 224, 255, 0.5);
+    }
+
+    .btn-outline {
+      border: 1.5px solid #00e0ff;
+      background: rgba(0, 224, 255, 0.08);
+      color: #00e0ff;
+      backdrop-filter: blur(4px);
+    }
+
+    .btn-outline:hover {
+      background: rgba(0, 224, 255, 0.2);
+      transform: translateY(-2px);
+      box-shadow: 0 0 18px rgba(0, 224, 255, 0.4);
+    }
+
+    /* Navbar */
+    .navbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 1.2rem 2rem;
+      backdrop-filter: blur(12px);
+      background: rgba(3, 5, 11, 0.75);
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      z-index: 100;
+      border-bottom: 1px solid rgba(0, 224, 255, 0.3);
+    }
+
+    .logo h1 {
+      font-size: 1.9rem;
+      font-weight: 800;
+      background: linear-gradient(125deg, #fff, #00e0ff);
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+    }
+    .logo p {
+      font-size: 0.7rem;
+      color: #b05eff;
+      letter-spacing: 1px;
+      margin-top: -5px;
+    }
+    .nav-links {
+      display: flex;
+      gap: 2.2rem;
+      list-style: none;
+    }
+    .nav-links a {
+      text-decoration: none;
+      color: #eef5ff;
+      font-weight: 500;
+      transition: 0.2s;
+    }
+    .nav-links a:hover {
+      color: #00e0ff;
+      text-shadow: 0 0 6px #00e0ff;
+    }
+    .hamburger {
+      display: none;
+      font-size: 1.8rem;
+      cursor: pointer;
+      color: #00e0ff;
+    }
+
+    /* Hero */
+    .hero {
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      position: relative;
+    }
+    .hero-content {
+      max-width: 800px;
+    }
+    .badge {
+      background: rgba(0, 224, 255, 0.15);
+      padding: 0.3rem 1.2rem;
+      border-radius: 40px;
+      font-size: 0.8rem;
+      border: 1px solid #00e0ff;
+      display: inline-block;
+      margin-bottom: 1.5rem;
+      backdrop-filter: blur(5px);
+    }
+    .hero h1 {
+      font-size: 4.5rem;
+      font-weight: 800;
+      line-height: 1.2;
+      margin-bottom: 1.5rem;
+    }
+    .hero-gradient {
+      background: linear-gradient(135deg, #fff, #00e0ff, #c084fc);
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+    }
+    .hero p {
+      font-size: 1.25rem;
+      color: #cbd5ff;
+      margin-bottom: 2rem;
+    }
+
+    /* Services Grid */
+    .services-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 2rem;
+    }
+    .service-card {
+      background: rgba(12, 18, 32, 0.65);
+      backdrop-filter: blur(8px);
+      border-radius: 32px;
+      padding: 2rem 1.8rem;
+      border: 1px solid rgba(0, 224, 255, 0.25);
+      transition: all 0.4s cubic-bezier(0.2, 0.9, 0.4, 1.1);
+    }
+    .service-card:hover {
+      transform: translateY(-12px);
+      border-color: #00e0ff;
+      background: rgba(8, 14, 28, 0.9);
+      box-shadow: 0 20px 35px -12px rgba(0, 224, 255, 0.3);
+    }
+    .service-icon {
+      font-size: 3rem;
+      margin-bottom: 1.2rem;
+      color: #00e0ff;
+    }
+    .service-card h3 {
+      font-size: 1.7rem;
+      margin-bottom: 0.8rem;
+    }
+
+    /* About + stats */
+    .about-wrap {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 3rem;
+    }
+    .about-text {
+      flex: 1.2;
+    }
+    .about-stats {
+      flex: 0.8;
+      display: flex;
+      flex-direction: column;
+      gap: 1.2rem;
+    }
+    .stat-item {
+      background: rgba(0, 224, 255, 0.05);
+      border-left: 4px solid #00e0ff;
+      padding: 1.3rem;
+      border-radius: 24px;
+    }
+    .stat-number {
+      font-size: 2.3rem;
+      font-weight: 800;
+      color: #00e0ff;
+    }
+
+    /* Contact */
+    .contact-grid {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 2rem;
+    }
+    .contact-info, .contact-form {
+      flex: 1;
+      background: rgba(10, 16, 28, 0.7);
+      backdrop-filter: blur(10px);
+      border-radius: 36px;
+      padding: 2rem;
+      border: 1px solid rgba(0, 224, 255, 0.2);
+    }
+    input, textarea {
+      width: 100%;
+      padding: 1rem;
+      background: #0f172f;
+      border: 1px solid #2a3a60;
+      border-radius: 24px;
+      color: white;
+      font-family: inherit;
+    }
+    input:focus, textarea:focus {
+      border-color: #00e0ff;
+      outline: none;
+    }
+    .social-links a {
+      color: #eef5ff;
+      font-size: 1.5rem;
+      margin-right: 1rem;
+      transition: 0.2s;
+    }
+    .social-links a:hover {
+      color: #00e0ff;
+    }
+
+    footer {
+      text-align: center;
+      padding: 2rem;
+      background: #01020a;
+      border-top: 1px solid rgba(0,224,255,0.2);
+    }
+
+    /* data-scroll reveal classes */
+    .fade-up {
+      opacity: 0;
+      transform: translateY(40px);
+      transition: opacity 0.8s ease, transform 0.8s ease;
+    }
+    .fade-up.is-inview {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    @media (max-width: 880px) {
+      .nav-links {
+        display: none;
+        flex-direction: column;
+        position: absolute;
+        top: 70px;
+        left: 0;
+        width: 100%;
+        background: rgba(3,5,11,0.95);
+        backdrop-filter: blur(20px);
+        padding: 1.5rem;
+        gap: 1.2rem;
+        text-align: center;
+      }
+      .nav-links.active {
+        display: flex;
+      }
+      .hamburger {
+        display: block;
+      }
+      .hero h1 { font-size: 2.6rem; }
+      .section-title { font-size: 2.2rem; }
+      /* show default cursor on mobile to avoid conflict */
+      body { cursor: auto; }
+      .mouse-follower, .mouse-trail { display: none; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- Three.js canvas container -->
+<div id="canvas-container"></div>
+
+<!-- Mouse follower elements -->
+<div class="mouse-follower" id="mouseFollower"></div>
+<div class="mouse-trail" id="mouseTrail"></div>
+
+<nav class="navbar">
+  <div class="logo">
+    <h1>HIOTAMI</h1>
+    <p>TECHNOLOGIES PVT LTD</p>
+  </div>
+  <div class="hamburger" id="hamburger"><i class="fas fa-bars"></i></div>
+  <ul class="nav-links" id="navLinks">
+    <li><a href="#home" data-scroll-to>Home</a></li>
+    <li><a href="#services" data-scroll-to>Services</a></li>
+    <li><a href="#about" data-scroll-to>About</a></li>
+    <li><a href="#contact" data-scroll-to>Contact</a></li>
+  </ul>
+</nav>
+
+<main data-scroll-container>
+  <div id="home" class="hero" data-scroll-section>
+    <div class="container">
+      <div class="hero-content" data-scroll data-scroll-speed="0.8" data-scroll-delay="0.05">
+        <span class="badge"><i class="fas fa-microchip"></i> 3D KINETIC TECH</span>
+        <h1>Code · Deploy · Dominate<br><span class="hero-gradient">Beyond Static Limits</span></h1>
+        <p>Hiotami Technologies delivers custom software, intelligent warehouse ERP, high‑performance web platforms, and full‑scale internet facility management — all driven by bold engineering.</p>
+        <div class="hero-buttons">
+          <a href="#services" class="btn btn-primary" data-scroll-to>Explore Services <i class="fas fa-arrow-right"></i></a>
+          <a href="#contact" class="btn btn-outline" data-scroll-to>Launch Project <i class="fas fa-rocket"></i></a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <section id="services" data-scroll-section>
+    <div class="container">
+      <h2 class="section-title fade-up" data-scroll data-scroll-class="is-inview">⚡ Core Tech Arsenal</h2>
+      <div class="services-grid">
+        <div class="service-card fade-up" data-scroll data-scroll-class="is-inview" data-scroll-delay="0.05">
+          <div class="service-icon"><i class="fas fa-code"></i></div>
+          <h3>Custom Software Dev</h3>
+          <p>Scalable enterprise apps, microservices, and API ecosystems — built for the future.</p>
+        </div>
+        <div class="service-card fade-up" data-scroll data-scroll-class="is-inview" data-scroll-delay="0.1">
+          <div class="service-icon"><i class="fas fa-cubes"></i></div>
+          <h3>Warehouse ERP System</h3>
+          <p>Real‑time inventory, multi‑location logistics, barcode & automation — total visibility.</p>
+        </div>
+        <div class="service-card fade-up" data-scroll data-scroll-class="is-inview" data-scroll-delay="0.15">
+          <div class="service-icon"><i class="fas fa-laptop-code"></i></div>
+          <h3>Website Development</h3>
+          <p>Blazing fast React/Vue sites, e‑commerce, PWAs with immersive UX.</p>
+        </div>
+        <div class="service-card fade-up" data-scroll data-scroll-class="is-inview" data-scroll-delay="0.2">
+          <div class="service-icon"><i class="fas fa-network-wired"></i></div>
+          <h3>Internet Facility Mgmt</h3>
+          <p>ISP infrastructure, 24/7 NOC, high‑availability fiber networks and campus solutions.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="about" data-scroll-section>
+    <div class="container">
+      <h2 class="section-title fade-up" data-scroll data-scroll-class="is-inview">🔮 Who we are</h2>
+      <div class="about-wrap">
+        <div class="about-text fade-up" data-scroll data-scroll-class="is-inview">
+          <p style="font-size:1.2rem; margin-bottom:1rem;">Hiotami Technologies Private Limited — bold engineering meets industrial innovation.</p>
+          <p>We are a collective of software architects, ERP specialists, and network engineers. From warehouse logistics optimization to bleeding‑edge digital experiences and internet backbone management — we fuse deep tech with audacious design.</p>
+          <p style="margin-top:1rem;"><i class="fas fa-check-circle" style="color:#00e0ff;"></i> 24/7 Enterprise Support &nbsp;|&nbsp; <i class="fas fa-check-circle" style="color:#00e0ff;"></i> End‑to‑end Integration &nbsp;|&nbsp; <i class="fas fa-check-circle" style="color:#00e0ff;"></i> Zero‑compromise Security</p>
+          <a href="#contact" class="btn btn-outline" style="margin-top:1.8rem;" data-scroll-to>Partner with us <i class="fas fa-handshake"></i></a>
+        </div>
+        <div class="about-stats">
+          <div class="stat-item fade-up" data-scroll data-scroll-class="is-inview" data-scroll-delay="0.05"><div class="stat-number">50+</div><div>Warehouse Deployments</div></div>
+          <div class="stat-item fade-up" data-scroll data-scroll-class="is-inview" data-scroll-delay="0.1"><div class="stat-number">120+</div><div>Web Projects Shipped</div></div>
+          <div class="stat-item fade-up" data-scroll data-scroll-class="is-inview" data-scroll-delay="0.15"><div class="stat-number">99.98%</div><div>Network Uptime SLA</div></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="contact" data-scroll-section>
+    <div class="container">
+      <h2 class="section-title fade-up" data-scroll data-scroll-class="is-inview">📡 Connect & Forge</h2>
+      <div class="contact-grid">
+        <div class="contact-info fade-up" data-scroll data-scroll-class="is-inview">
+          <h3 style="font-size:1.8rem;">Let's build the future</h3>
+          <p><i class="fas fa-map-marker-alt"></i> Hiotami Technologies Pvt Ltd, Commercial Complex, 400A, 4th Floor, 12 Ajit Singh House, Yusuf Sarai, Green Park, New Delhi, Delhi 110016</p>
+          <p><i class="fas fa-envelope"></i> hello@hiotami.com</p>
+          <p><i class="fas fa-phone-alt"></i> +91 8448202639</p>
+          <div class="social-links">
+
+          </div>
+          <div style="margin-top:1.5rem;"><i class="fas fa-shield-alt"></i> </div>
+        </div>
+        <div class="contact-form fade-up" data-scroll data-scroll-class="is-inview" data-scroll-delay="0.1">
+          <form id="contactForm">
+            <div class="input-group"><input type="text" id="name" placeholder="Full Name" required></div>
+            <div class="input-group"><input type="email" id="email" placeholder="Business Email" required></div>
+            <div class="input-group"><textarea rows="4" id="message" placeholder="Your ERP / Web / Network requirements..."></textarea></div>
+            <button type="submit" class="btn btn-primary" style="width:100%;"><i class="fas fa-paper-plane"></i> Send message</button>
+            <p style="font-size:0.7rem; margin-top:12px; text-align:center;">Our experts will reach out within 24h</p>
+          </form>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <footer data-scroll-section>
+    <p>© 2025 Hiotami Technologies Private Limited — 3D Kinetic Vision</p>
+  </footer>
+</main>
+
+<!-- SCRIPTS: Three.js, GSAP, Locomotive, Mouse Follower -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/locomotive-scroll@4.1.4/dist/locomotive-scroll.min.js"></script>
+
+<script>
+  // ---------- MOUSE FOLLOWER (TECH ORB + TRAIL) ----------
+  const follower = document.getElementById('mouseFollower');
+  const trail = document.getElementById('mouseTrail');
+  let mouseX = 0, mouseY = 0;
+  let followerX = 0, followerY = 0;
+  let trailX = 0, trailY = 0;
+
+  // Use GSAP for smooth follower animation (lerp)
+  function updateFollower() {
+    // Smooth follow for main orb
+    followerX += (mouseX - followerX) * 0.12;
+    followerY += (mouseY - followerY) * 0.12;
+    follower.style.left = followerX + 'px';
+    follower.style.top = followerY + 'px';
+    
+    // Trail with more lag
+    trailX += (mouseX - trailX) * 0.2;
+    trailY += (mouseY - trailY) * 0.2;
+    trail.style.left = trailX + 'px';
+    trail.style.top = trailY + 'px';
+    
+    requestAnimationFrame(updateFollower);
+  }
+  
+  // Track mouse position relative to viewport (account for scroll, but fixed elements use page coords? No, mouse events give clientX/clientY)
+  document.addEventListener('mousemove', (e) => {
+    mouseX = e.clientX;
+    mouseY = e.clientY;
+  });
+  
+  // Hover effect on interactive elements: enlarge and change color
+  const interactiveElements = document.querySelectorAll('a, .btn, button, .service-card, .nav-links a, .social-links a, input, textarea, .stat-item');
+  interactiveElements.forEach(el => {
+    el.addEventListener('mouseenter', () => {
+      follower.classList.add('hover-active');
+    });
+    el.addEventListener('mouseleave', () => {
+      follower.classList.remove('hover-active');
+    });
+  });
+  
+  // Also handle when mouse leaves window (optional)
+  document.addEventListener('mouseleave', () => {
+    follower.style.opacity = '0';
+    trail.style.opacity = '0';
+  });
+  document.addEventListener('mouseenter', () => {
+    follower.style.opacity = '1';
+    trail.style.opacity = '0.7';
+  });
+  
+  // start animation
+  updateFollower();
+  
+  // ---------- THREE.JS DYNAMIC BACKGROUND ----------
+  const container = document.getElementById('canvas-container');
+  const scene = new THREE.Scene();
+  scene.background = null;
+  const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
+  camera.position.set(0, 0, 12);
+  const renderer = new THREE.WebGLRenderer({ alpha: true });
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.setPixelRatio(window.devicePixelRatio);
+  container.appendChild(renderer.domElement);
+
+  // Lights
+  const ambientLight = new THREE.AmbientLight(0x111122);
+  scene.add(ambientLight);
+  const pointLight = new THREE.PointLight(0x00e0ff, 1, 30);
+  pointLight.position.set(2, 3, 4);
+  scene.add(pointLight);
+  const backLight = new THREE.PointLight(0x8a2be2, 0.7);
+  backLight.position.set(-2, 1, -5);
+  scene.add(backLight);
+
+  // Main glowing torus knot
+  const geometry = new THREE.TorusKnotGeometry(1.2, 0.32, 180, 24, 3, 4);
+  const material = new THREE.MeshStandardMaterial({
+    color: 0x00e0ff,
+    emissive: 0x004466,
+    emissiveIntensity: 0.65,
+    metalness: 0.8,
+    roughness: 0.25,
+    wireframe: false
+  });
+  const knot = new THREE.Mesh(geometry, material);
+  scene.add(knot);
+
+  // Floating particles
+  const particleCount = 1200;
+  const particlesGeometry = new THREE.BufferGeometry();
+  const positions = new Float32Array(particleCount * 3);
+  for (let i = 0; i < particleCount; i++) {
+    positions[i*3] = (Math.random() - 0.5) * 40;
+    positions[i*3+1] = (Math.random() - 0.5) * 25;
+    positions[i*3+2] = (Math.random() - 0.5) * 30 - 15;
+  }
+  particlesGeometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+  const particleMaterial = new THREE.PointsMaterial({
+    color: 0x88aaff,
+    size: 0.07,
+    transparent: true,
+    opacity: 0.6,
+    blending: THREE.AdditiveBlending
+  });
+  const particles = new THREE.Points(particlesGeometry, particleMaterial);
+  scene.add(particles);
+
+  // secondary ring
+  const ringGeo = new THREE.TorusGeometry(1.8, 0.05, 64, 300);
+  const ringMat = new THREE.MeshStandardMaterial({ color: 0xff44aa, emissive: 0x331133, emissiveIntensity: 0.5 });
+  const ring = new THREE.Mesh(ringGeo, ringMat);
+  scene.add(ring);
+
+  let time = 0;
+  function animate3D() {
+    requestAnimationFrame(animate3D);
+    time += 0.008;
+    knot.rotation.x += 0.005;
+    knot.rotation.y += 0.008;
+    knot.rotation.z += 0.003;
+    ring.rotation.x = Math.sin(time * 0.5) * 0.2;
+    ring.rotation.y = time * 0.3;
+    ring.rotation.z = time * 0.2;
+    particles.rotation.y = time * 0.02;
+    particles.rotation.x = Math.sin(time * 0.1) * 0.1;
+    camera.position.z = 12 + Math.sin(time * 0.2) * 0.1;
+    camera.lookAt(0, 0, 0);
+    renderer.render(scene, camera);
+  }
+  animate3D();
+
+  window.addEventListener('resize', () => {
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+  });
+
+  // ---------- LOCOMOTIVE + GSAP SCROLLTRIGGER SYNC ----------
+  const scrollEl = document.querySelector('[data-scroll-container]');
+  const locomotiveScroll = new LocomotiveScroll({
+    el: scrollEl,
+    smooth: true,
+    multiplier: 0.9,
+    smartphone: { smooth: true },
+    tablet: { smooth: true }
+  });
+
+  locomotiveScroll.on('scroll', ScrollTrigger.update);
+  ScrollTrigger.scrollerProxy(scrollEl, {
+    scrollTop(value) {
+      return arguments.length ? locomotiveScroll.scrollTo(value, 0, 0) : locomotiveScroll.scroll.instance.scroll.y;
+    },
+    getBoundingClientRect() {
+      return {top: 0, left: 0, width: window.innerWidth, height: window.innerHeight};
+    },
+    pinType: document.querySelector('[data-scroll-container]').style.transform ? "transform" : "fixed"
+  });
+
+  ScrollTrigger.addEventListener('refresh', () => locomotiveScroll.update());
+  ScrollTrigger.refresh();
+
+  // GSAP animations for cards
+  gsap.utils.toArray('.service-card').forEach((card, i) => {
+    gsap.fromTo(card, 
+      { opacity: 0, y: 40, scale: 0.96 },
+      {
+        opacity: 1, y: 0, scale: 1,
+        duration: 0.9,
+        ease: "power3.out",
+        scrollTrigger: {
+          trigger: card,
+          scroller: scrollEl,
+          start: "top 85%",
+          end: "top 60%",
+          toggleActions: "play none none reverse"
+        }
+      }
+    );
+  });
+
+  gsap.fromTo('.hero-content h1', 
+    { opacity: 0, y: 50, filter: 'blur(8px)' },
+    { opacity: 1, y: 0, filter: 'blur(0px)', duration: 1.2, ease: "back.out(0.7)", scrollTrigger: { trigger: '.hero', scroller: scrollEl, start: "top 90%", toggleActions: "play none none reset" } }
+  );
+  gsap.fromTo('.hero p', { opacity: 0, x: -30 }, { opacity: 1, x: 0, duration: 1, delay: 0.2, scrollTrigger: { trigger: '.hero', scroller: scrollEl, start: "top 85%" } });
+  gsap.fromTo('.hero-buttons .btn', { opacity: 0, y: 20 }, { opacity: 1, y: 0, stagger: 0.1, duration: 0.8, scrollTrigger: { trigger: '.hero', scroller: scrollEl, start: "top 85%" } });
+
+  setTimeout(() => {
+    locomotiveScroll.update();
+    ScrollTrigger.refresh();
+  }, 300);
+
+  // Mobile nav + smooth anchor using locomotive scroll
+  const hamburger = document.getElementById('hamburger');
+  const navLinksEl = document.getElementById('navLinks');
+  hamburger.addEventListener('click', () => navLinksEl.classList.toggle('active'));
+  document.querySelectorAll('[data-scroll-to]').forEach(anchor => {
+    anchor.addEventListener('click', function(e) {
+      e.preventDefault();
+      const targetId = this.getAttribute('href').substring(1);
+      const targetElem = document.getElementById(targetId);
+      if (targetElem && locomotiveScroll) {
+        locomotiveScroll.scrollTo(targetElem, { offset: -70, duration: 1000 });
+        if (navLinksEl.classList.contains('active')) navLinksEl.classList.remove('active');
+      }
+    });
+  });
+
+  // Contact form logic
+  const contactForm = document.getElementById('contactForm');
+  contactForm.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const name = document.getElementById('name').value.trim();
+    const email = document.getElementById('email').value.trim();
+    const msg = document.getElementById('message').value.trim();
+    if (!name || !email || !msg) {
+      alert("Please fill all fields.");
+      return;
+    }
+    alert(`🚀 ${name}, your message is transmitted. Hiotami's team will contact you at ${email} within 24h.`);
+    contactForm.reset();
+  });
+  
+  // Make sure follower stays on top when locomotive scroll updates layers
+  const style = document.createElement('style');
+  style.innerHTML = `.mouse-follower, .mouse-trail { position: fixed !important; }`;
+  document.head.appendChild(style);
+</script>
+</body>
+</html>
